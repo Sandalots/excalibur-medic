@@ -22,11 +22,9 @@ situation.
 | [`excalibur_inference.py`](excalibur_inference.py) | The deployed runtime inference script for the Pi 5: corpus, BM25 index, five guards, verbatim path, and the interface to `llama-server`. Standard library only |
 | [`benchmark_pi.sh`](benchmark_pi.sh) | Measures the Pi 5 device: throughput, peak memory, index cost, end-to-end latency; `--energy` adds power and a thermal sustained soak to check for thermal throttling|
 
-Supporting: [`deploy_to_pi.sh`](deploy_to_pi.sh) copies the payload to the board,
-[`macintosh/mac_infer.sh`](macintosh/mac_infer.sh) runs the same runtime on the Mac, and
-[`scripts/`](scripts/) fetches and verifies the corpus.
+Supporting: [`deploy_to_pi.sh`](deploy_to_pi.sh) copies the model payload to the pi 5 board.
 
-## Models and corpus
+## Models and corpus used
 | | |
 |---|---|
 | Teacher | `mlx-community/Llama3-OpenBioLLM-8B`, 4-bit |
