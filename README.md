@@ -1,4 +1,4 @@
-# EXCALIBUR-Medic
+# The EXCALIBUR Medic Model
 An offline clinical reference device. A 1B model, distilled from a 4-bit 8B medical
 teacher and quantised to 770 MB, answers questions from a BM25 index over 19,411 NIH,
 FDA and MedlinePlus documents, targeted to run on a Raspberry Pi 5 with 2 GB of RAM, with no network at
