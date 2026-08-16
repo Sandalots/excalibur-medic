@@ -10,9 +10,7 @@ passage, and where no suitable passage exists the system says so rather than gue
 Built on a MacBook M3 Pro (18 GB) with Apple MLX, also tested to work on a M4 Mac mini (16 GB).
 
 Answering reference questions that name a condition or a drug, for example the following potential user queries; *what are the symptoms of
-hypothyroidism*, *who should not take warfarin*, *is lisinopril safe in pregnancy*. It is
-a lookup tool, not a triage assistant, and it declines questions about a specific person's
-situation.
+hypothyroidism*, *who should not take warfarin*, *is lisinopril safe in pregnancy*.
 
 ## Three implementing artefacts
 | Filename | Purpose |
