@@ -1,0 +1,35 @@
+# EXCALIBUR-Medic — example queries
+
+What is sarcoidosis?
+What is polycythemia vera?
+What is alpha-1 antitrypsin deficiency?
+What is Marfan syndrome?
+
+What are the symptoms of Parkinson's disease?
+What are the symptoms of celiac disease?
+What are the symptoms of hypothyroidism?
+What are the symptoms of sleep apnea?
+
+What causes gout?
+What causes osteoporosis?
+What causes heart failure?
+What causes psoriasis?
+
+What are the treatments for depression?
+What are the treatments for COPD?
+What are the treatments for rheumatoid arthritis?
+What are the treatments for Wilson disease?
+
+How to diagnose multiple sclerosis?
+How to diagnose celiac disease?
+How to diagnose narcolepsy?
+
+Who is at risk for breast cancer?
+Who is at risk for type 2 diabetes?
+
+Is cystic fibrosis inherited?
+Is sickle cell disease inherited?
+
+How to prevent osteoporosis?
+
+What is the outlook for narcolepsy?

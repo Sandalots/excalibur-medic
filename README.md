@@ -10,7 +10,7 @@ passage, and where no suitable passage exists the system says so rather than gue
 Built on a MacBook M3 Pro (18 GB) with Apple MLX, also tested to work on a M4 Mac mini (16 GB).
 
 Answering reference questions that name a condition or a drug, for example the following potential user queries; *what are the symptoms of
-hypothyroidism*, *who should not take warfarin*, *is lisinopril safe in pregnancy*.
+hypothyroidism*, *what causes gout*, *what is metformin used for*.
 
 ## Three implementing artefacts
 | Filename | Purpose |
@@ -50,3 +50,21 @@ In session, `?` lists the commands, `stats` toggles the timing block and `exit` 
 ./benchmark_pi.sh            # threads, memory, index, end-to-end
 ./benchmark_pi.sh --energy   # ~50 min: idle floor, joules per query, thermal soak
 ```
+
+[`example_queries.txt`](example_queries.txt) holds 25 questions verified to pass the
+guards and retrieve the right document, spread across all eight paraphrased facets.
+
+## Layout
+```
+excalibur.ipynb           build pipeline: CoT to gate to LoRA to fuse to GGUF to quantise
+excalibur_inference.py    the deployed runtime — index, guards, llama-server
+
+benchmark_pi.sh           Pi 5 measurement; --energy adds power and thermal soak
+deploy_to_pi.sh           ships runtime + corpora + GGUF over one reused SSH connection
+reset.sh                  clears generated artefacts, keeps the fetched corpus
+
+datasets/medquad.csv      NIH question-answer pairs, the retrieval backbone
+artifacts/                everything generated — GGUF, fetched corpora, aliases, index
+measurements/             benchmark and energy logs the notebook tables are built from
+```
+`INSTALLATION.md` covers both machines end to end installation instructions.
