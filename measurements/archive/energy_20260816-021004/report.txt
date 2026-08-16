@@ -1,0 +1,96 @@
+
+== PRE-FLIGHT ==
+   PMIC reads 2.1373 W at rest — plausible, proceeding
+   Raspberry Pi 5 Model B Rev 1.1
+   RAM 2010 MB total, 1838 MB available
+   sampling at 1 Hz -> energy_20260816-021004/samples.csv
+
+== A. BOARD IDLE — no server (120s) ==
+   the floor everything else is measured against
+
+== B. SERVER RESIDENT, IDLE (180s) ==
+   where an always-on reference device actually spends its life
+   server up on :8080 (excalibur_inference.py will reuse it rather than start a second)
+
+== C. PER-QUERY ENERGY — 20 questions through retrieval + generation ==
+   excalibur_inference.py end to end: BM25, the guards, the model. Not generation alone.
+    1/20  What are the symptoms of gout?
+    2/20  What causes glaucoma?
+    3/20  How do you treat hypothyroidism?
+    4/20  Is Marfan syndrome inherited?
+    5/20  What is the dose of metformin?
+    6/20  What are the symptoms of Lupus?
+    7/20  How is diabetes diagnosed?
+    8/20  What causes migraines?
+    9/20  What are the side effects of atorvastatin?
+   10/20  How do you prevent falls?
+   11/20  What is (are) Glaucoma ?
+   12/20  What causes anemia?
+   13/20  What are the symptoms of asthma?
+   14/20  How do you treat eczema?
+   15/20  Is cystic fibrosis inherited?
+   16/20  What causes kidney stones?
+   17/20  What are the warnings for ibuprofen?
+   18/20  How is anemia treated?
+   19/20  What causes high blood pressure?
+   20/20  What are the symptoms of shingles?
+
+== D. SUSTAINED LOAD (40 min) — does it throttle? ==
+   back-to-back generation. The point is not the average watt figure, it is whether
+   tok/s decays and at what temperature — which single short requests cannot show.
+   10 generations, temp=59.3'C, 37 min left
+   20 generations, temp=60.4'C, 35 min left
+   30 generations, temp=60.4'C, 32 min left
+   40 generations, temp=59.8'C, 30 min left
+   50 generations, temp=59.8'C, 28 min left
+   60 generations, temp=59.8'C, 25 min left
+   70 generations, temp=60.4'C, 23 min left
+   80 generations, temp=60.4'C, 20 min left
+   90 generations, temp=60.9'C, 18 min left
+   100 generations, temp=60.9'C, 16 min left
+   110 generations, temp=59.3'C, 13 min left
+   120 generations, temp=60.9'C, 11 min left
+   130 generations, temp=60.9'C, 8 min left
+   140 generations, temp=60.4'C, 6 min left
+   150 generations, temp=60.4'C, 4 min left
+   160 generations, temp=59.3'C, 1 min left
+   168 generations
+
+== RESULTS ==
+
+  POWER BY PHASE
+   board idle, no server        1.55 W mean     3.13 W peak    49.4 °C peak   (111 samples)
+   server resident, idle        1.51 W mean     2.82 W peak    47.7 °C peak   (168 samples)
+   sustained generation         5.38 W mean     6.26 W peak    63.7 °C peak   (2284 samples)
+
+   holding the model resident costs -0.04 W over a bare board
+   generating costs +3.87 W over an idle server
+
+  6 of 20 questions returned in 0.44-0.63 s WITHOUT calling the model —
+   refusal, disambiguation or a verbatim quote. Those paths cost no measurable
+   energy; the per-query figures below cover only the ones that generated.
+
+  PER QUERY  (n=14, full path: retrieval + guards + generation)
+   median latency              15.5 s
+   median energy, gross        84.4 J
+   median energy, MARGINAL     60.3 J   <- the cost of answering
+   range, marginal           11.8 - 95.6 J
+
+  SUSTAINED LOAD  (168 generations over 40 min)
+   first  33 generations      14.02 tok/s   58.7 °C
+   last   33 generations      14.01 tok/s   60.9 °C
+   change                     -0.00 tok/s (-0.0%)
+   get_throttled             clean throughout
+   -> holds its throughput. No thermal ceiling at this duty cycle.
+
+  AT 20 QUERIES/HOUR
+   average draw                1.85 W  (idle 1.51 + queries 0.34)
+
+   PMIC-derived and therefore a LOWER BOUND: it excludes PSU conversion loss
+   and anything drawing downstream of the PMIC. Real draw at the wall is higher.
+
+== DONE ==
+   Everything is in energy_20260816-021004.
+
+   samples: energy_20260816-021004/samples.csv
+   report : energy_20260816-021004/report.txt

@@ -1,0 +1,9 @@
+
+== PRE-FLIGHT ==
+   PMIC reads 1.8788 W at rest — plausible, proceeding
+   Raspberry Pi 5 Model B Rev 1.1
+   RAM 2010 MB total, 1836 MB available
+   sampling at 1 Hz -> energy_20260815-220958/samples.csv
+
+== A. BOARD IDLE — no server (120s) ==
+   the floor everything else is measured against

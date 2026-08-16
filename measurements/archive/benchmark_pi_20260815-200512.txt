@@ -1,0 +1,66 @@
+
+== HOST ==
+Linux 6.18.39+rpt-rpi-2712 aarch64
+Model		: Raspberry Pi 5 Model B Rev 1.1
+cores: 4
+RAM: 2010 MB total, 1779 MB available
+temp=44.4'C
+Raspberry Pi 5 Model B Rev 1.1
+
+== PREREQUISITES ==
+ok      /home/sandalots/excalibur/artifacts/excalibur-medic-1b-Q4_K_M.gguf (771M)
+ok      /home/sandalots/excalibur/datasets/medquad.csv (22M)
+ok      /home/sandalots/excalibur/excalibur_inference.py (80K)
+ok      /home/sandalots/llama.cpp/build/bin/llama-cli
+ok      /home/sandalots/llama.cpp/build/bin/llama-server
+ok      /home/sandalots/excalibur/artifacts/drug_labels.csv (5.2M)
+ok      /home/sandalots/excalibur/artifacts/drug_aliases.json (48K)
+
+== 0. CORPUS THE RUNNER WILL ACTUALLY USE ==
+  corpus_combined.csv   aliases: 2562
+  benchmarks below use: artifacts/corpus_combined.csv
+
+== 1. GENERATION SPEED vs THREADS (ctx 2048 + q8_0 KV = the deployed config) ==
+threads   gen_tok/s      prompt_tok/s   total_s     
+1         9.5            22.1           9.7         
+2         14.7           44.2           6.3         
+3         14.2           60.7           6.5         
+4         13.1           78.8           7.0         
+note: generation is memory-bandwidth bound and peaks at 2 threads; prompt
+      processing is compute-bound and scales to 4. The Pi 5 is a 2 GB board, headless, with ~1.6 GB usable RAM.
+
+== 2. PEAK MEMORY (llama-server, the deployed path) ==
+ctx 1024  KV f16   (default      ) peak RSS   1636 MB   free while up: 905 MB
+ctx 2048  KV q8_0  (quantised-KV ) peak RSS   1638 MB   free while up: 896 MB
+budget note: 2 GB board, headless, ~1.6 GB usable — anything near that will swap
+
+== 3. BM25 INDEX ON ARM (pure python) ==
+docs 19411  terms 31977
+build 3.4s   query 7.6 ms   python peak RSS 128 MB
+
+== 4. END-TO-END WITH RETRIEVAL ==
+index: 19411 docs, 31977 terms (cached, 0.8s)
+starting llama-server (ctx 2048, 2 threads)…
+server ready
+  [ref: 'What are the symptoms of Hypothyroidism ?' score 43.3 coverage 1.00]
+
+── ANSWER ──────────────────────────────────────────────────────
+
+The symptoms of Hypothyroidism include fatigue, weight gain, a puffy face, cold intolerance, joint and muscle pain, constipation, dry skin, dry, thinning hair, decreased sweating, heavy or irregular menstrual periods, impaired fertility, depression, slowed heart rate, goiter, and a feeling of fullness in the throat.
+
+  [grounded in reference · 76 tok · 13.2 tok/s]
+  ┌────────────────────────────────────────────────────────────────────────────────────────────
+  │ retrieval        32.3 ms    index 19,411 docs
+  │ prompt            348 tok   75.7 tok/s    first token 4.65 s
+  │ generation         76 tok   13.2 tok/s    wall 10.4 s
+  │ cpu               71% system    server 284% of 400%
+  │ memory           1549 MB peak  (1525 now)    856 MB available
+  │ thermal      57.9 °C   2400 MHz   not throttled
+  │ energy           6.17 W mean   17.59 mWh this answer   0.833 J/tok   (SoC rails, not wall)
+  └────────────────────────────────────────────────────────────────────────────────────────────
+-------------------------------------------------------------
+
+== DONE ==
+Paste the contents of the log file below back. It is plain text, no personal data.
+
+output saved to: /home/sandalots/excalibur/benchmark_pi_20260815-200512.txt
