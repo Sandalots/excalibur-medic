@@ -1,14 +1,14 @@
 # Installation
 Two machines. The **Mac** trains the model and builds the artefact; the **Pi** runs it.
-Nothing is trained on the Pi. Inference is solely done on-device on the Pi 5.
+Nothing is trained on the Pi 5. Inference is solely done on-device on the Pi 5, as-well as the models benchmarking measuring.
 
 | | Mac | Raspberry Pi 5 |
 |---|---|---|
-| does | CoT generation, SFT, fuse → GGUF → quantise | serves answers, offline |
-| needs | Apple silicon, 18 GB RAM, ~25 GB free | Pi 5 2 GB, headless, ~2 GB free |
-| takes | ~13 h, resumable | ~25 min, mostly compiling |
+| does | CoT generation, SFT, fuse to GGUF to quantise | serves answers, offline |
+| needs | Apple silicon, 18 GB RAM | Pi 5 2 GB, headless, ~2 GB free |
+| takes | ~13 h, resumable | ~25 min, mostly compiling llama-cpp |
 
-Part A produces the deployable artefact; Part B puts it on the device and measures it.
+Part A produces the deployable excalibur model artefact; Part B puts it on the device and measures it.
 
 ## Part A · The Mac
 ### A1 · llama.cpp
@@ -34,10 +34,6 @@ python3 -m venv .venv
 .venv/bin/python -c "import mlx_lm, torch, gguf; print('ok')"
 ```
 
-> Do **not** install llama.cpp's `requirements-convert_hf_to_gguf.txt`. It pins
-> `numpy~=1.26.4`, downgrades numpy, and breaks `import mlx_lm` with a misleading
-> `AutoTokenizer` error.
-
 ### A3 · Run the notebook
 ```bash
 jupyter lab excalibur.ipynb        # kernel: EXCALIBUR (.venv)
@@ -54,7 +50,7 @@ Run All.
 | behaviour data | ~1 min |
 | **SFT, 2,500 LoRA steps** | **~46 min** |
 | held-out eval, abstention | ~5 min |
-| fuse → GGUF → imatrix → quantise → verify | ~4 min |
+| fuse to GGUF to imatrix to quantise to verify | ~4 min |
 | corpus, analysis, figures, run summary | ~2 min |
 
 **CoT generation is resumable.** It appends to `artifacts/synthetic/cot_full.jsonl` and skips what is
@@ -65,7 +61,7 @@ quality gate writes; running it twice without the gate between appends the behav
 examples again. Run All is always safe.
 
 ### A4 · Rebuild without retraining
-Re-run the two export sections; each step skips when its output is newer than its input.
+Rerun the two export sections; each step skips when its output is newer than its input.
 
 ```bash
 ./reset.sh          # remove generated artefacts, keep the fetched corpus
@@ -79,10 +75,10 @@ The fetched corpus ships with the repository.
 ```
 
 Re-fetching gives you today's openFDA and MedlinePlus, so figures will land near the
-recorded ones rather than on them.
+recorded ones rather than on them, so will drift slightly.
 
 ### A6 · Verify
-No Pi or GPU needed.
+No Pi 5 or GPU acceleration needed.
 
 ```bash
 .venv/bin/python scripts/verify_retrieval.py    # guards, verbatim path, retrieval
@@ -153,45 +149,4 @@ In session: `?` for commands, `stats` to toggle timings, `exit` to quit.
 `--energy` requires a Pi 5; it reads the PMIC via `vcgencmd pmic_read_adc` and stops
 within seconds if that returns nothing.
 
-## Options
-| flag | default | what it does |
-|---|---|---|
-| `-q`, `--question` | — | answer one question and exit |
-| `--lite` | off | skip the startup panel |
-| `--stats` | off | per-answer compute, memory, thermal, energy |
-| `--quiet` | off | hide retrieval diagnostics |
-| `--no-reasoning` | off | skip the reasoning block, ~half the tokens |
-| `-c`, `--ctx` | 2048 | context length |
-| `-t`, `--threads` | 2 | generation threads |
-| `-tb`, `--threads-batch` | 4 | prompt-processing threads |
-| `--kv-type` | `q8_0` | KV cache precision |
-| `-n`, `--max-tokens` | 500 | generation cap |
-| `--temp` | 0.0 | sampling temperature |
-| `--min-score` | 2.0 | BM25 floor |
-| `--min-coverage` | 0.5 | fraction of question terms the document must cover |
-| `--min-topic` | 0.4 | how much of the document's subject the question must name |
-| `--rebuild-index` | off | ignore the cached index |
-| `--no-rag` | off | ablation: disable retrieval |
-| `--allow-ungrounded` | off | ablation: answer with no reference — **it will fabricate** |
-
-## Troubleshooting
-**`import mlx_lm` fails with an `AutoTokenizer` error.** numpy was downgraded, almost
-always by llama.cpp's converter requirements. Reinstall:
-`.venv/bin/python -m pip install -r requirements.txt`.
-
-**`IncompleteSnapshotError` at the fuse cell.** `mlx_lm.load()` downloads only what the
-model needs; `fuse`'s `save()` validates the whole snapshot. The cell completes it
-automatically, but needs network once:
-
-```bash
-.venv/bin/python -c "from huggingface_hub import snapshot_download; \
-  snapshot_download('mlx-community/Llama-3.2-1B-Instruct-bf16')"
-```
-
-**`llama-server` will not start on the Pi.** Usually memory. Check `free -m`, run
-`pkill llama-server`, and confirm you are headless.
-
-**Retrieval returns nothing sensible after a corpus change.** Force a rebuild:
-`python3 excalibur_inference.py --rebuild-index`.
-
-**Answers truncate mid-list.** Context is 2048 and the injection budget 2,600 characters.
+The last two benchmark runs are also reproduced within the table from the supplied measurement subdirectory that contains the latest two runs plus an archive of older runs.
