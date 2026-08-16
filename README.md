@@ -19,8 +19,6 @@ hypothyroidism*, *who should not take warfarin*, *is lisinopril safe in pregnanc
 | [`excalibur_inference.py`](excalibur_inference.py) | The deployed runtime inference script for the Pi 5: corpus, BM25 index, five guards, verbatim path, and the interface to `llama-server`. Standard library only |
 | [`benchmark_pi.sh`](benchmark_pi.sh) | Measures the Pi 5 device: throughput, peak memory, index cost, end-to-end latency; `--energy` adds power and a thermal sustained soak to check for thermal throttling|
 
-Supporting: [`deploy_to_pi.sh`](deploy_to_pi.sh) copies the model payload to the pi 5 board.
-
 ## Models and corpus used
 | | |
 |---|---|
