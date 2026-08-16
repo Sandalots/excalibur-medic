@@ -66,5 +66,7 @@ reset.sh                  clears generated artefacts, keeps the fetched corpus
 datasets/medquad.csv      NIH question-answer pairs, the retrieval backbone
 artifacts/                everything generated — GGUF, fetched corpora, aliases, index
 measurements/             benchmark and energy logs the notebook tables are built from
+
+example_user_prompts.txt  Around 25 example user query medical prompts of which the model will generate reasoning and answers to
 ```
 `INSTALLATION.md` covers both machines end to end installation instructions.
