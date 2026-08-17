@@ -24,9 +24,10 @@ _MPLUS    = ROOT / "artifacts" / "medlineplus.csv"          # NLM health topics
 _PARTS    = (_MEDQUAD, _DRUGS, _MPLUS)
 _COMBINED = ROOT / "artifacts" / "corpus_combined.csv"      # derived from the above
 
+# the combined corpus, rebuilt when any source CSV is newer than it
 def _corpus() -> Path:
     # staleness check: without it a deploy that added medlineplus.csv kept indexing
-    # 17,307 docs instead of 19,411, and the stamp reported "cached" at every layer.
+    # 17,307 docs instead of 19,411, and the stamp reported "cached" at every layer
     # derive identity from the INPUTS, not from an output existing
     if _COMBINED.exists():
         newest = max((p.stat().st_mtime for p in _PARTS if p.exists()), default=0)
@@ -72,10 +73,10 @@ SYSTEM_PROMPT = ( "You are EXCALIBUR-Medic, an offline clinical reference assist
 STOP = set("""the a an and or of to in for with is are was were be been being on at by from as that this these those it its can may might will would should could have has had not no if you your patient patients treatment symptoms cause causes disease condition what who how does do did there their them then than when where which while about into over under""".split())
 
 _TOK = re.compile(r"[a-z][a-z0-9]{2,}")
-# Eponyms as the corpus writes them: "Alzheimer's", "Crohn's". Feeds BM25Index.poss.
+# eponyms as the corpus writes them: "Alzheimer's", "Crohn's". Feeds BM25Index.poss.
 
 _POSS = re.compile(r"\b([a-z]{3,})'s\b")
-# A one-word alias in this many documents or more is ordinary vocabulary, not a
+# a one-word alias in this many documents or more is ordinary vocabulary, not a
 # brand. See prune_aliases() for the measurement behind the number.
 _ALIAS_MAX_DF = 10
 
@@ -135,6 +136,7 @@ _COND_PATS = [
     r"tell me about (.+?)\s*\?*$",
 ]
 
+# the condition a question is about, or None if it names none
 def condition_of(text: str) -> str | None:
     t = text.lower().strip()
 
@@ -151,6 +153,7 @@ def condition_of(text: str) -> str | None:
         
     return None
 
+# which aspect is asked about -- dose, symptoms, causes and so on
 def facet_of(text: str) -> str:
     t = text.lower()
 
@@ -161,11 +164,13 @@ def facet_of(text: str) -> str:
         
     return "other"
 
+# lowercase words, minus the retrieval stop list
 def tokenize(text: str) -> list[str]:
     return [w for w in _TOK.findall(text.lower()) if w not in RETRIEVAL_STOP]
 
 # index
 class BM25Index:
+    # an empty index; build() or load() fills it
     def __init__(self, k1: float = BM25_K1, b: float = BM25_B):
         self.k1, self.b = k1, b
         self.stamp: str | None = None      # corpus identity; see corpus_stamp()
@@ -181,6 +186,7 @@ class BM25Index:
         self.avglen = 1.0
 
     @classmethod
+    # read the corpus once, building postings, IDF and the facet and condition maps
     def build(cls, csv_path: Path) -> "BM25Index":
         ix = cls()
         seen = set()
@@ -235,6 +241,7 @@ class BM25Index:
 
         return prune_aliases(ix)
 
+    # raw BM25 over the postings, before any of the tuned boosts
     def _bm25(self, query: str) -> dict[int, float]:
         scores: dict[int, float] = {}
 
@@ -255,8 +262,8 @@ class BM25Index:
 
         return scores
 
+    # the three tuned adjustments, in place -- each measured on held-out questions
     def _boost(self, scores: dict[int, float], query: str) -> None:
-        """The three tuned adjustments, in place. Each was measured on held-out questions."""
         # MedlinePlus topics are short and broad, and BM25 length normalisation
         # rewards that -- "primary hyperparathyroidism" answered from "Parathyroid
         # Disorders", functional@1 100.0% -> 96.8%. they fill gaps, not compete
@@ -288,7 +295,7 @@ class BM25Index:
 
                     elif dc in qc:
                         # doc is BROADER than the question ("glaucoma" for a query about
-                        # "early-onset glaucoma") -- a reasonable fallback.
+                        # "early-onset glaucoma") -- a reasonable fallback
                         scores[d] *= (1.0 + CONDITION_BOOST * 0.5)
 
                     elif qc in dc:
@@ -297,12 +304,14 @@ class BM25Index:
                         # question, so barely boost it
                         scores[d] *= (1.0 + CONDITION_BOOST * 0.15)
 
+    # top-k documents for a query, boosts applied
     def search(self, query: str, k: int = 1) -> list[tuple[float, int]]:
         scores = self._bm25(query)
         self._boost(scores, query)
 
         return sorted(((s, d) for d, s in scores.items()), reverse=True)[:k]
 
+    # pickle the index beside the corpus it was built from
     def save(self, path: Path) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -310,6 +319,7 @@ class BM25Index:
             pickle.dump({"stamp": self.stamp, "k1": self.k1, "b": self.b, "docs": self.docs, "dfacet": self.dfacet, "dcond": self.dcond, "dgeneral": self.dgeneral, "poss": self.poss, "post_ids": self.post_ids, "post_tf": self.post_tf, "idf": self.idf, "doclen": self.doclen, "avglen": self.avglen}, f, protocol=pickle.HIGHEST_PROTOCOL)
 
     @staticmethod
+    # read a pickled index back, stamp included so staleness can be checked
     def load(path: Path) -> "BM25Index":
         with open(path, "rb") as f:
             d = pickle.load(f)
@@ -327,6 +337,7 @@ class BM25Index:
 
         return prune_aliases(ix)
 
+# name, size and mtime -- cheap identity for the cached index
 def corpus_stamp(csv_path: Path) -> str:
     try:
         st = csv_path.stat()
@@ -336,6 +347,7 @@ def corpus_stamp(csv_path: Path) -> str:
     except OSError:
         return "missing"
 
+# load the cached index, rebuilding when the corpus stamp has moved
 def get_index(csv_path: Path, cache: Path, rebuild: bool = False) -> BM25Index:
     want = corpus_stamp(Path(csv_path))
 
@@ -368,11 +380,13 @@ def get_index(csv_path: Path, cache: Path, rebuild: bool = False) -> BM25Index:
         
     return ix
 
+# ANSI codes, blank until enable() decides the terminal can take them
 class S:
     RESET = DIM = BOLD = ITAL = CYAN = YELLOW = GREEN = RED = BLUE = GREY = ""
     WHITE = MAGENTA = ""
 
     @classmethod
+    # turn colour on only for a real terminal, so piping to a log stays clean
     def enable(cls, mode: str = "auto") -> None:
         on = (mode == "always") or ( mode == "auto" and sys.stdout.isatty() and os.environ.get("TERM", "") not in ("", "dumb") and "NO_COLOR" not in os.environ )
 
@@ -384,6 +398,7 @@ class S:
         cls.RED, cls.BLUE, cls.GREY = "\033[31m", "\033[94m", "\033[90m"
         cls.WHITE, cls.MAGENTA = "\033[97m", "\033[95m"
 
+# a horizontal rule, optionally with a label set into it
 def rule(label: str = "", width: int = 64, colour: str = "") -> str:
     c = colour or S.BLUE
 
@@ -392,23 +407,27 @@ def rule(label: str = "", width: int = 64, colour: str = "") -> str:
     
     return f"{c}── {label} {'─' * max(0, width - len(label) - 4)}{S.RESET}"
 
+# colours the <reasoning> and <answer> blocks as they stream past
 class TagStyler:
     OPEN = {"<reasoning>": "reasoning", "<answer>": "answer"}
     CLOSE = {"</reasoning>", "</answer>"}
     _MAXLEN = max(len(t) for t in list(OPEN) + list(CLOSE))
 
+    # buffer and section state for the incoming stream
     def __init__(self, out=None):
         self.out = out or sys.stdout
         self.buf, self.section, self.started = "", None, False
 
     _STYLE = {"reasoning": lambda: S.BLUE, "answer": lambda: S.WHITE + S.BOLD}
 
+    # the divider printed when a new section opens
     def _header(self, name: str) -> str:
         if name == "reasoning":
             return f"\n{rule('reasoning', colour=S.GREY)}\n"
         
         return f"\n{rule('ANSWER', colour=S.GREEN)}\n"
 
+    # take a chunk of the stream, colour any complete tags, hold back a partial one
     def feed(self, chunk: str) -> None:
         self.buf += chunk
 
@@ -454,6 +473,7 @@ class TagStyler:
 
         self.out.flush()
 
+    # write whatever is left in the buffer at the end of a stream
     def flush(self) -> None:
         if self.buf:
             self.out.write(self.buf)
@@ -462,10 +482,12 @@ class TagStyler:
         self.out.write(S.RESET + "\n")
         self.out.flush()
 
+# the panel printed at launch: model, corpus, guards and thresholds
 def startup_report(args, ix) -> None:
     e = sys.stderr
     w = 64
 
+    # one aligned key and value line of the startup panel
     def row(k, v, colour=""):
         print(f"  {S.CYAN}{k:<13}{S.RESET}{colour}{v}{S.RESET}", file=e)
 
@@ -539,6 +561,7 @@ def startup_report(args, ix) -> None:
 
 _CLK = os.sysconf("SC_CLK_TCK") if hasattr(os, "sysconf") else 100
 
+# read a proc or sysfs file, None if it is not there
 def _read(path: str) -> str | None:
     try:
         with open(path) as f:
@@ -547,6 +570,7 @@ def _read(path: str) -> str | None:
     except OSError:
         return None
 
+# run vcgencmd, None when it is missing or fails -- absent off a Pi
 def _vcgencmd(*args: str) -> str | None:
     try:
         out = subprocess.run(["vcgencmd", *args], capture_output=True, text=True, timeout=2)
@@ -556,6 +580,7 @@ def _vcgencmd(*args: str) -> str | None:
     except Exception:
         return None
 
+# whole-board watts from the Pi 5 PMIC, None on other hardware
 def board_power_w() -> float | None:
     txt = _vcgencmd("pmic_read_adc")
 
@@ -579,6 +604,7 @@ def board_power_w() -> float | None:
     
     return sum(v * amps[r] for r, v in volts.items() if r in amps) or None
 
+# busy and total jiffies, for working out CPU use between two reads
 def cpu_jiffies() -> tuple[int, int] | None:
     txt = _read("/proc/stat")
 
@@ -597,6 +623,7 @@ def cpu_jiffies() -> tuple[int, int] | None:
 
     return sum(vals) - idle, sum(vals)
 
+# CPU seconds a pid has used
 def proc_cpu(pid: int) -> float | None:
     txt = _read(f"/proc/{pid}/stat")
 
@@ -611,8 +638,8 @@ def proc_cpu(pid: int) -> float | None:
     except (ValueError, IndexError):
         return None
 
+# current and peak RSS in MB for a pid
 def proc_mem_mb(pid: int) -> tuple[float | None, float | None]:
-    """(current RSS, peak RSS) in MB for a pid."""
     txt = _read(f"/proc/{pid}/status")
 
     if not txt:
@@ -629,6 +656,7 @@ def proc_mem_mb(pid: int) -> tuple[float | None, float | None]:
 
     return cur, peak
 
+# memory the kernel says is actually available, not just free
 def mem_available_mb() -> float | None:
     txt = _read("/proc/meminfo")
 
@@ -642,6 +670,7 @@ def mem_available_mb() -> float | None:
         
     return None
 
+# SoC temperature, sysfs first and vcgencmd as a fallback
 def soc_temp_c() -> float | None:
     raw = _read("/sys/class/thermal/thermal_zone0/temp")
 
@@ -658,6 +687,7 @@ def soc_temp_c() -> float | None:
 
     return float(m.group(1)) if m else None
 
+# current clock of core 0
 def cpu_mhz() -> float | None:
     raw = _read("/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq")
 
@@ -667,6 +697,7 @@ def cpu_mhz() -> float | None:
     except ValueError:
         return None
 
+# decode the Pi's throttle flags, None when nothing is flagged
 def throttled() -> str | None:
     txt = _vcgencmd("get_throttled")
 
@@ -688,10 +719,13 @@ def throttled() -> str | None:
 
     return ", ".join(flags) or f"0x{bits:x}"
 
+# samples board power on a thread for the length of a with-block
 class PowerSampler:
+    # sampling interval and an empty sample list
     def __init__(self, hz: float = 1.0):
         self.interval, self.samples, self._stop = 1.0 / hz, [], None
 
+    # start sampling, or do nothing at all when this is not a Pi 5
     def __enter__(self):
         if board_power_w() is None:
             return self # not a Pi 5; no-op
@@ -702,6 +736,7 @@ class PowerSampler:
 
         return self
 
+    # the sampling loop, one reading per interval until stopped
     def _run(self):
         while not self._stop.is_set():
             w = board_power_w()
@@ -711,6 +746,7 @@ class PowerSampler:
 
             self._stop.wait(self.interval)
 
+    # stop the thread and wait briefly for it to finish
     def __exit__(self, *exc):
         if self._stop:
             self._stop.set()
@@ -718,8 +754,8 @@ class PowerSampler:
 
         return False
 
+    # mean watts and watt-hours over the samples taken
     def result(self) -> tuple[float | None, float | None]:
-        """(mean watts, watt-hours)."""
         if len(self.samples) < 2:
             return (self.samples[0][1] if self.samples else None), None
         
@@ -732,6 +768,7 @@ class PowerSampler:
 
         return (wh * 3600 / span if span > 0 else None), wh
 
+# the per-answer telemetry block behind --stats
 def print_stats(dt, ttft, nframes, timings, pid, cpu0, pcpu0, power, ix, retr_ms):
     tm = timings or {}
 
@@ -822,6 +859,7 @@ def print_stats(dt, ttft, nframes, timings, pid, cpu0, pcpu0, power, ix, retr_ms
 
 # --------------------------------------------------------------------------- server
 class Server:
+    # reuse a server already on this port, otherwise start one
     def __init__(self, model: Path, port: int, ctx: int, threads: int, kv_type: str = "q8_0", threads_batch: int | None = None):
         self.port, self.proc = port, None
         self.url = f"http://127.0.0.1:{port}"
@@ -861,6 +899,7 @@ class Server:
 
         sys.exit("llama-server did not become ready in 180s")
 
+    # is a server answering on the port yet?
     def _alive(self) -> bool:
         try:
             with urllib.request.urlopen(f"{self.url}/health", timeout=2) as r:
@@ -869,9 +908,10 @@ class Server:
         except Exception:
             return False
 
+    # stream a completion back token by token
     def stream(self, messages: list[dict], max_tokens: int, temp: float,
                prefill: str | None = None):
-        # prefilling an assistant turn forces the model to continue from that text.
+        # prefilling an assistant turn forces the model to continue from that text
         # SFT trained on the bare question, so with a reference already in context
         # the model skips the reasoning -- it appeared only when retrieval FAILED
         if prefill:
@@ -908,6 +948,7 @@ class Server:
                 if delta.get("content"):
                     yield delta["content"]
 
+    # stop the server, but only if this process was the one that started it
     def close(self):
         if self.proc and self.proc.poll() is None:
             self.proc.send_signal(signal.SIGTERM)
@@ -918,7 +959,7 @@ class Server:
             except subprocess.TimeoutExpired:
                 self.proc.kill()
 
-# facets where OMITTING something is dangerous: quoted verbatim, model bypassed.
+# facets where OMITTING something is dangerous: quoted verbatim, model bypassed
 # asked for the metformin dose it dropped "do not use below eGFR 30"; for atorvastatin's
 # side effects it emitted five fabricated statistics. `define` stays prose
 VERBATIM_FACETS = {"dose", "contra", "warning", "sideeffect", "interact", "pregnancy"}
@@ -956,18 +997,21 @@ except Exception:
 ALIASES.update(INN_NAMES)
 _ALIAS_RE = (re.compile(r"\b(" + "|".join(sorted(map(re.escape, ALIASES), key=len, reverse=True)) + r")\b", re.I) if ALIASES else None)
 
+# swap brand names for the generics the corpus is keyed on
 def expand_aliases(text: str) -> str:
     if not _ALIAS_RE:
         return text
     
     return _ALIAS_RE.sub(lambda m: ALIASES[m.group(0).lower()], text)
 
+# put back the apostrophe the user left out of a condition name
 def restore_possessives(text: str, ix: "BM25Index") -> str:
     if not getattr(ix, "poss", None):
         return text
     
     return re.sub(r"\b([A-Za-z]{3,}s)\b", lambda m: ix.poss.get(m.group(1).lower(), m.group(1)), text)
 
+# drop aliases that shadow something the corpus answers directly
 def prune_aliases(ix: "BM25Index") -> "BM25Index":
     global _ALIAS_RE
 
@@ -996,7 +1040,7 @@ VERBATIM_MAX = 9000
 VERBATIM_SOURCE = re.compile(r"Human Phenotype Ontology", re.I)
 
 # preview one sentence of orientation before a quoted section, which otherwise answers a
-# dose question with 2,624 median characters and no lead-in.
+# dose question with 2,624 median characters and no lead-in
 #
 # the model composes it INSIDE A GRAMMAR: the kind and topic are literals, and its
 # only choice is between two reason clauses. a wrong choice is still a true one
@@ -1009,6 +1053,7 @@ _TABLE_KIND = "table of reported signs and their individual frequencies"
 # the text the model was unreliable, so no cross-check is claimed on it
 PREVIEW_SYS = ( "You introduce a medical reference document that is shown to the reader in full " "beneath your sentence. Say what it is and why text of that kind is reproduced word " "for word rather than summarised. Do not describe its contents or state any number.")
 
+# a grammar that forces the verbatim preamble into a fixed shape
 def _gbnf(topic: str | None, is_table: bool, kind: str) -> str:
     # `kind` is a literal and `reason` is gated on is_table, both decided from the
     # source rather than offered to the model. letting it choose called a two-line
@@ -1019,6 +1064,7 @@ def _gbnf(topic: str | None, is_table: bool, kind: str) -> str:
 
     return (f'root ::= "This is the " kind{tp} ", quoted in full because " reason "."\n' f'kind ::= "{kind}"\n' f"reason ::= {' | '.join(reasons)}\n")
 
+# one framing sentence before a quote, generated under that grammar
 def verbatim_preview(question: str, text: str, is_table: bool, srv=None, port: int = 8080) -> str | None:
     topic = condition_of(question)
 
@@ -1027,6 +1073,7 @@ def verbatim_preview(question: str, text: str, is_table: bool, srv=None, port: i
 
     expected = _TABLE_KIND if is_table else PREVIEW_KINDS.get(facet_of(question) or "")
 
+    # a written preamble for when the model cannot produce one
     def fallback():
         if not expected:
             return None
@@ -1054,12 +1101,13 @@ def verbatim_preview(question: str, text: str, is_table: bool, srv=None, port: i
     
     return out
 
+# cut to a length on a sentence boundary where possible
 def trim(text: str, limit: int, note: bool = True) -> str:
     if len(text) <= limit:
         return text
     
     # `note` off for model context: the marker is for the READER. Pasted into reference
-    # material it is just a sentence the model may copy into its answer.
+    # material it is just a sentence the model may copy into its answer
     tail = "\n\n[section continues — consult the full label]" if note else ""
     head = text[:limit]
 
@@ -1071,12 +1119,14 @@ def trim(text: str, limit: int, note: bool = True) -> str:
         
     return head.rsplit(" ", 1)[0].rstrip() + " …" + tail
 
+# strip the MedlinePlus title wrapping off a condition name
 def pretty_condition(c: str) -> str:
     c = re.sub(r"^what i need to know about\s+", "", c)
     c = re.sub(r"^(do you have information about|learning about)\s+", "", c)
 
     return c.strip()
 
+# conditions filed under a broader one, for the disambiguation list
 def narrower_matches(ix: "BM25Index", qc: str, facet: str, limit: int = 8) -> list[str]:
     seen: list[str] = []
 
@@ -1100,6 +1150,7 @@ def narrower_matches(ix: "BM25Index", qc: str, facet: str, limit: int = 8) -> li
 # distance, and it suggests without rewriting -- `hypertention` fits two opposites
 _MIN_DF_SUGGEST = 25          # below this the candidate is probably a typo in the corpustoo: `symtoms` and `symtpoms` are both in the vocabulary
 
+# spelling suggestions for query terms the index has never seen
 def did_you_mean(ix: "BM25Index", question: str, limit: int = 2) -> list[str]:
     out: list[str] = []
 
@@ -1108,7 +1159,7 @@ def did_you_mean(ix: "BM25Index", question: str, limit: int = 2) -> list[str]:
         if term in ix.idf or len(term) < 5:
             continue
 
-        # Narrow before comparing: same initial, length within two, and common enough to
+        # narrow before comparing: same initial, length within two, and common enough to
         # be a real word. Comparing against all 32k terms gets the same answer slower.
         cands = [v for v in ix.idf
                  # length within ONE, not two. "syntoms"->"symptoms" and
@@ -1125,16 +1176,19 @@ def did_you_mean(ix: "BM25Index", question: str, limit: int = 2) -> list[str]:
 
     return out
 
+# IDF-weighted fraction of one term set that appears in another
 def _idf_overlap(ix: BM25Index, want: set[str], have: set[str]) -> float:
     mx = max(ix.idf.values()) if ix.idf else 1.0
     total = sum(ix.idf.get(w, mx) for w in want)
 
     return sum(ix.idf.get(w, mx) for w in want if w in have) / total if total else 0.0
 
+# retrieve, run the five guards, and return either a prompt or a refusal
 def build_messages(question: str, ix: BM25Index | None, min_score: float, max_ctx_chars: int, verbose: bool,  min_coverage: float = 0.5, min_topic: float = 0.4, _retry: bool = True) -> tuple[list[dict], bool, list[str], str | None]:
     if ix is None:
         return ([{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": question}], False, [], None)
 
+    # retry once without articles before giving up on a refusal
     def refused_retry():
         if not _retry:
             return None
@@ -1155,10 +1209,11 @@ def build_messages(question: str, ix: BM25Index | None, min_score: float, max_ct
         
         return None
 
+    # the refusal message, with any spelling or narrower-topic options attached
     def refuse(user_msg: str, options: tuple[str, ...] | list[str] = ()):
         return refused_retry() or ([{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": user_msg}], False, list(options), None)
     
-    # Retrieval view of the question: brand names resolved to generics and possessives
+    # retrieval view of the question: brand names resolved to generics and possessives
     # restored. Display and prompt text keep the user's own wording.
     rq = restore_possessives(expand_aliases(question), ix)
     hits = ix.search(rq, k=1)
@@ -1179,8 +1234,8 @@ def build_messages(question: str, ix: BM25Index | None, min_score: float, max_ct
             print(f"  [no usable reference — score {score:.1f} (need {min_score}), " f"coverage {coverage:.2f} (need {min_coverage})]", file=sys.stderr)
             
         user = (f"Question: {question}\n\n" "IMPORTANT: no reference material was found for this question in your " "medical corpus. Do NOT guess. If the question is outside medicine, say " "it is outside your scope. If it is medical but unfamiliar, say you do " "not have a reference for it and recommend consulting a clinician. " "Give no numbers, dosages, or specifics.")
-        # A spelling suggestion is offered, not applied -- see did_you_mean(). It rides the
-        # existing options channel, which already exists for the disambiguation path.
+        # a spelling suggestion is offered, not applied -- see did_you_mean(). It rides the
+        # existing options channel, which already exists for the disambiguation path
         typos = did_you_mean(ix, question)
 
         return refuse(user, [f"did you mean:  {t}" for t in typos])
@@ -1188,7 +1243,7 @@ def build_messages(question: str, ix: BM25Index | None, min_score: float, max_ct
     qc_, dc_ = condition_of(rq), (ix.dcond[doc] if ix.dcond else "")
     qf_, df_ = facet_of(rq), (ix.dfacet[doc] if ix.dfacet else "")
 
-    # FACET GAP: right condition, wrong aspect, nothing covering the aspect asked.
+    # FACET GAP: right condition, wrong aspect, nothing covering the aspect asked
     # "symptoms of cancer" matched the DEFINITION entry, so the condition check below
     # stayed silent and the model invented a 22-item symptom list
     if qc_ and dc_ and qc_ == dc_ and qf_ != "other" and qf_ != df_:
@@ -1215,8 +1270,8 @@ def build_messages(question: str, ix: BM25Index | None, min_score: float, max_ct
             
             return refuse(user)
 
-    # Asked about something broader than anything indexed -> disambiguate, do not
-    # substitute a narrower topic and present it as the answer.
+    # asked about something broader than anything indexed -> disambiguate, do not
+    # substitute a narrower topic and present it as the answer
     if qc_ and dc_ and qc_ != dc_ and qc_ in dc_:
         opts = narrower_matches(ix, qc_, facet_of(rq))
 
@@ -1243,8 +1298,8 @@ def build_messages(question: str, ix: BM25Index | None, min_score: float, max_ct
 
     q, a = ix.docs[doc]
 
-    # Quote when the FACET is safety-critical, or when the SOURCE is a frequency table
-    # this model cannot read (see VERBATIM_SOURCE).
+    # quote when the FACET is safety-critical, or when the SOURCE is a frequency table
+    # this model cannot read (see VERBATIM_SOURCE)
     table_source = bool(VERBATIM_SOURCE.search(a))
 
     if qf_ in VERBATIM_FACETS or table_source:
@@ -1270,6 +1325,7 @@ def build_messages(question: str, ix: BM25Index | None, min_score: float, max_ct
 
     return ([{"role": "system", "content": SYSTEM_PROMPT},{"role": "user", "content": user}], True, [], None)
 
+# parse arguments, start the server, then answer one question or loop
 def main() -> None:
     ap = argparse.ArgumentParser(description="EXCALIBUR-Medic with BM25 retrieval")
     ap.add_argument("-q", "--question", help="answer one question and exit")
@@ -1323,6 +1379,7 @@ def main() -> None:
 
     REFUSAL = ( "<answer>\nI do not have a reference for that in my medical corpus, so I cannot " "answer it reliably. If this is a clinical question, please consult a clinician " "or a current medical reference.\n</answer>")
 
+    # one question end to end: retrieve, generate, then print stats if asked
     def answer(qs: str) -> None:
         _r0 = time.time()
         msgs, grounded, options, verbatim = build_messages(qs, ix, args.min_score, args.max_ctx_chars, verbose, args.min_coverage, args.min_topic)

@@ -50,14 +50,15 @@ CLARIFY_TEMPLATE = (
 
 FACET_WORD = {"treat": "treatments", "symptom": "symptoms", "cause": "causes", "diagnos": "diagnostic approaches", "prevent": "prevention", "risk": "risk factors", "define": "definitions"}
 
+# the same corpus the runner indexes, MedQuAD if the combined CSV is absent
 def load_corpus():
     path = MR.DEFAULT_CSV if MR.DEFAULT_CSV.exists() else MR._MEDQUAD
 
     with open(path, newline="", encoding="utf-8") as f:
         return [r for r in csv.DictReader(f) if r.get("answer") and r.get("question")]
 
-# Phrasings the same refusal has to survive. Twelve fixed strings would be memorised;
-# the behaviour has to generalise to wording the model has not seen.
+# phrasings the same refusal has to survive. Twelve fixed strings would be memorised;
+# the behaviour has to generalise to wording the model has not seen
 ASK = ["What is the {x}?", "How much {x} is correct?", "Can you tell me the {x}?", "I need to know the {x}.", "What would you recommend for the {x}?", "Quick question — the {x}?"]
 
 OOD_SUBJECTS = [
@@ -96,6 +97,7 @@ PERSONAL_SUBJECTS = [
     "How long do I have?",
 ]
 
+# refusals for questions that only sound clinical, and ones only a clinician can answer
 def build_abstention(rng) -> list[dict]:
     rows = []
 
@@ -114,6 +116,7 @@ def build_abstention(rng) -> list[dict]:
             rows.append({"question": lead + q[0].lower() + q[1:], "reference": "", "focus_area": "__abstain_personal__", "split": "train", "completion": PERSONAL_TEMPLATE})
     return rows
 
+# ask-back examples, offering the real narrower conditions rather than picking one
 def build_clarification(corpus, rng, limit=40) -> list[dict]:
     conds = {}
 
@@ -148,6 +151,7 @@ def build_clarification(corpus, rng, limit=40) -> list[dict]:
 HPO_RE = re.compile(r"Human Phenotype Ontology", re.I)
 FREQ_RE = re.compile(r"([A-Z][A-Za-z /'\-]{3,40}?)\s+(\d+(?:\.\d+)?)%")
 
+# rewrite an HPO frequency table as a few named signs, not the whole list
 def deenumerate(reference: str) -> str | None:
     pairs = [(m.group(1).strip(), float(m.group(2))) for m in FREQ_RE.finditer(reference)]
 
@@ -185,6 +189,7 @@ def deenumerate(reference: str) -> str | None:
             f"Frequencies are per sign, not for the condition as a whole, and come from "
             f"studies of small numbers of patients.\n</answer>")
 
+# de-enumerated replacements for the HPO rows in the SFT set, keyed by question
 def build_deenumerated(corpus, rng, limit=None) -> list[dict]:
     sft = OUT / "sft_train.jsonl"
 
@@ -220,6 +225,7 @@ def build_deenumerated(corpus, rng, limit=None) -> list[dict]:
         
     return rows
 
+# build the three behaviours, report the mix, write the two files
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--preview", action="store_true", help="print samples, write nothing")

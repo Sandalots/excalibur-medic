@@ -70,8 +70,8 @@ for i in idxs:
     
     func += (ix.dcond[d] == ix.dcond[i] and ix.dfacet[d] == ix.dfacet[i])
 
-# A comparison line must name the corpus it compares against: a MedQuAD-only baseline
-# printed beside a combined-corpus measurement invents a regression that does not exist.
+# a comparison line must name the corpus it compares against: a MedQuAD-only baseline
+# printed beside a combined-corpus measurement invents a regression that does not exist
 print(f"\n4. RETRIEVAL (1200 held-out, combined corpus; expect strict ~82.9% / " f"functional ~97.1%)")
 
 print(f"   strict {100*strict/1200:.1f}%   functional {100*func/1200:.1f}%   " f"{(time.time()-t)/1200*1000:.1f} ms/q")

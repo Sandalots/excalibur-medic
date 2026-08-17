@@ -26,15 +26,15 @@ REFUSED = re.compile(r"do not have a reference|cannot answer it reliably|" r"doe
 # each entry names how to regenerate it -- update a block whole, never one number
 MEASURED = {
     # `evaluate.py ablate` -- 40 held-out questions, identical retrieved reference,
-    # greedy decoding, only the weights differing.
+    # greedy decoding, only the weights differing
     "ablation": {
         "labels":    ["base\nLlama-3.2-1B", "shipped adapter\nSFT + behaviour"],
         "grounding": [0.473, 0.602],
         "format":    [0.000, 0.975],
     },
 
-    # Grounding floors on 600 MedQuAD rows. The oracle row is `evaluate.py ceiling`;
-    # the others score generated answers against deliberately wrong references.
+    # grounding floors on 600 MedQuAD rows. The oracle row is `evaluate.py ceiling`;
+    # the others score generated answers against deliberately wrong references
     "grounding_floors": [
         ("null — a different condition entirely",  0.090),
         ("right condition, wrong question type",   0.221),
@@ -44,7 +44,7 @@ MEASURED = {
         ("ceiling — answer scored against itself", 1.000),
     ],
 
-    # Teacher pilots: 120 questions, same quality gate, same patches.
+    # teacher pilots: 120 questions, same quality gate, same patches
     # (name, mean answer words, grounding, % kept by the gate)
     "teachers": [
         ("Bio-Medical-Llama-3-8B",  53, 0.706,  99.2),
@@ -64,22 +64,22 @@ MEASURED = {
         ("+ condition boost  (shipped)",           88.2),
     ],
 
-    # What the behaviour corpus bought, before and after mixing it into the SFT set.
+    # what the behaviour corpus bought, before and after mixing it into the SFT set
     "behaviour": {
         "format":     [0.80, 1.00],     # held-out format compliance
         "length":     [585, 368],       # mean answer length, characters
         "abstention": [16 / 16, 0 / 40],# refused when unanswerable / false refusals
     },
 
-    # `benchmark_pi.sh` on the deployed Pi 5, 2 GB, headless.
+    # `benchmark_pi.sh` on the deployed Pi 5, 2 GB, headless
     "pi_threads": {
         "threads":    [1, 2, 3, 4],
         "generation": [9.6, 14.6, 13.7, 12.7],
         "prompt":     [21.9, 44.3, 63.4, 77.7],
     },
 
-    # Three separate SFT runs at increasing data volume. Perplexity is each run's best
-    # validation figure; grounding is its held-out unaided mean.
+    # three separate SFT runs at increasing data volume. Perplexity is each run's best
+    # validation figure; grounding is its held-out unaided mean
     "capacity": {
         "samples":    [162, 481, 4900],
         "perplexity": [3.14, 2.54, 2.59],
@@ -88,7 +88,7 @@ MEASURED = {
 }
 
 # Pi measurement log readers
-# device figures are read back from the logs benchmark_pi.sh wrote on the Pi.
+# device figures are read back from the logs benchmark_pi.sh wrote on the Pi
 # both readers return None when absent, so a checkout without them still runs
 MEASUREMENTS = ROOT / "measurements"
 
@@ -98,16 +98,19 @@ def _num(pat, text, cast=float, default=None):
 
     return cast(m.group(1)) if m else default
 
+# newest benchmark log, or None on a checkout without one
 def find_bench(root: Path = MEASUREMENTS):
     c = sorted(Path(root).glob("benchmark_pi_*.txt"))
 
     return c[-1] if c else None
 
+# newest energy report, or None on a checkout without one
 def find_energy(root: Path = MEASUREMENTS):
     c = sorted(Path(root).glob("energy_*/report.txt"))
 
     return c[-1] if c else None
 
+# thread sweep, peak memory, index cost and the end-to-end pass
 def read_bench(path) -> dict:
     t = Path(path).read_text()
 
@@ -133,6 +136,7 @@ def read_bench(path) -> dict:
         "prompt_tps": _num(r"prompt\s+\d+\s+tok\s+([\d.]+)\s*tok/s", t),
     }
 
+# power per phase, joules per query, and whether the soak throttled
 def read_energy(path) -> dict:
     t = Path(path).read_text()
     phases = {}
@@ -147,6 +151,7 @@ def read_energy(path) -> dict:
             phases[key] = dict(mean=float(m.group(1)), peak=float(m.group(2)),
                                temp=float(m.group(3)), samples=int(m.group(4)))
 
+    # two numbers off one line, or None if the line is absent
     def pair(pat):
         m = re.search(pat, t)
 
@@ -176,11 +181,13 @@ def read_energy(path) -> dict:
         "duty_w":        _num(r"average draw\s+([\d.]+)\s*W", t),
     }
 
+# both logs, each None when missing, so the notebook degrades quietly
 def load_pi_measurements() -> tuple[dict | None, dict | None]:
     b, e = find_bench(), find_energy()
 
     return (read_bench(b) if b else None), (read_energy(e) if e else None)
 
+# how much of the answer appears in the reference -- the grounding metric
 def ground(answer: str, reference: str) -> float:
     # content words only, so stopwords cannot inflate the overlap
     a = {w for w in re.findall(r"[a-z]{4,}", answer.lower()) if w not in MR.STOP}
@@ -195,28 +202,35 @@ def boot_ci(d: np.ndarray, n: int = 5000, seed: int = 0):
 
     return np.percentile([rng.choice(d, len(d), replace=True).mean() for _ in range(n)], [2.5, 97.5])
 
-def setup(n_prompts: int):
-    # select cells by CONTENT, not index -- a rename and inserted cells once made
-    # both the filename and every index wrong. markers survive editing, positions do not
+# every code cell of the notebook, source only
+def nb_cells() -> list[str]:
     nb = nbformat.read(ROOT / "excalibur.ipynb", as_version=4)
-    cc = [c.source for c in nb.cells if c.cell_type == "code"]
 
-    def cell(marker):
-        hits = [c for c in cc if marker in c]
+    return [c.source for c in nb.cells if c.cell_type == "code"]
 
-        assert len(hits) == 1, f"{marker!r} matched {len(hits)} cells, expected 1"
+# the one cell holding a marker. select by CONTENT, not index -- a rename and inserted
+# cells once made both the filename and every index wrong. markers survive editing
+def cell(cc: list[str], marker: str) -> str:
+    hits = [c for c in cc if marker in c]
 
-        return hits[0]
+    assert len(hits) == 1, f"{marker!r} matched {len(hits)} cells, expected 1"
+
+    return hits[0]
+
+# load the notebook's imports and config into a namespace this script can call
+def setup(n_prompts: int):
+    cc = nb_cells()
+    cell_ = lambda m: cell(cc, m)
 
     # notebook cells run under IPython, which supplies display(); a plain exec does
     # not, and without it the data cell died and left `ns` half built. the calls are
-    # decorative, so a no-op will do -- but it has to exist.
+    # decorative, so a no-op will do -- but it has to exist
     # RUN_INSTALL=False so rebuilding eval state never reaches for the network
     ns = {"__name__": "__main__", "display": lambda *a, **k: None, "RUN_INSTALL": False}
 
-    # Imports and configuration are separate cells; both markers assert uniqueness.
-    exec(cell("import mlx.core as mx"), ns)
-    exec(cell("TEACHER_REPO  ="), ns)
+    # imports and configuration are separate cells; both markers assert uniqueness
+    exec(cell_("import mlx.core as mx"), ns)
+    exec(cell_("TEACHER_REPO  ="), ns)
     exec(cell("df = pd.read_csv(MEDQUAD)"), ns)
 
     syn = ns["SYNTH"]
@@ -305,6 +319,7 @@ def cmd_compare(args):
     if len(names) > 1:
         print("\nNOTE: a correct refusal scores 0 here, same as a wrong answer. If one adapter refuses, run `refusal` before concluding it is worse.")
 
+# does it refuse when retrieval missed, and answer when it did not?
 def cmd_refusal(args):
     ns, rows = setup(args.n)
     ix = MR.get_index(ROOT / "datasets" / "medquad.csv", MR.INDEX_CACHE, False)
@@ -365,14 +380,17 @@ def cmd_ceiling(args):
 
     gc.collect(); mx.clear_cache()
 
-    nb = nbformat.read(ROOT / "EXCALIBUR_distillation_pipeline.ipynb", as_version=4)
-    cc = [c.source for c in nb.cells if c.cell_type == "code"]
+    # cc[3] and cc[4] used to be these two; they are now the memory helper and the
+    # MedQuAD loader, and the notebook they were read from no longer exists
+    cc = nb_cells()
 
-    exec(cc[3], ns); exec(cc[4], ns)
+    exec(cell(cc, "teacher, teacher_tok ="), ns)   # loads the teacher
+    exec(cell(cc, "def _mk("), ns)                 # prompt templates and clean_teacher_text
 
     smp = make_sampler(temp=0.3, top_p=0.9)
     clean = ns["clean_teacher_text"]
 
+    # batch the teacher in eights, which is what fits beside the student
     def run(prompts):
         out = []
 
@@ -399,12 +417,14 @@ def cmd_ceiling(args):
               f"{'SIGNIFICANT' if (lo > 0 or hi < 0) else 'not significant'}")
 
 
+# base against shipped adapter on identical references, so only weights differ
 def cmd_ablate(args):
     ns, rows = setup(args.n)
     ix = MR.get_index(MR.DEFAULT_CSV, MR.INDEX_CACHE)
 
     print(f"\n  same {len(rows)} held-out questions, same retrieved reference, greedy\n")
 
+    # score one set of weights over every held-out question
     def arm(label, adapter):
         
         if adapter:
@@ -434,6 +454,7 @@ def cmd_ablate(args):
 
     print(f"\n  delta: grounding {s[0]-b[0]:+.3f}   format {100*(s[1]-b[1]):+.1f} points")
 
+# subcommands: compare, refusal, ceiling, ablate
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)

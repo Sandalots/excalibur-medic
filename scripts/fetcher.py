@@ -33,10 +33,12 @@ def http_json(url: str, timeout: int = 30):
     with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=timeout) as r:
         return json.load(r)
 
+# GET a URL and decode it, replacing what will not decode
 def http_text(url: str, timeout: int = 30) -> str:
     with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=timeout) as r:
         return r.read().decode("utf-8", "replace")
 
+# trim to a length without cutting a word in half
 def cut(text: str, limit: int) -> str:
     if len(text) <= limit:
         return text
@@ -51,6 +53,7 @@ def cut(text: str, limit: int) -> str:
         
     return head.rsplit(" ", 1)[0].rstrip() + " ..."
 
+# write a corpus CSV, making the directory if needed
 def write_rows(path: Path, rows: list[dict]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -60,10 +63,12 @@ def write_rows(path: Path, rows: list[dict]) -> None:
         w.writeheader()
         w.writerows(rows)
 
+# sorted JSON, so a re-fetch produces a readable diff
 def write_aliases(path: Path, mapping: dict[str, str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(mapping, indent=0, sort_keys=True))
 
+# every focus_area written so far, as raw, letters-only and single words
 def focus_areas(*csvs: Path) -> tuple[set[str], set[str], set[str]]:
     verbatim: set[str] = set()
     letters: set[str] = set()
@@ -91,6 +96,7 @@ def focus_areas(*csvs: Path) -> tuple[set[str], set[str], set[str]]:
 
     return verbatim, letters, words
 
+# import excalibur_inference by path, to reuse its facet rules
 def runner():
     spec = importlib.util.spec_from_file_location("_mr", ROOT / "excalibur_inference.py")
     mod = importlib.util.module_from_spec(spec)
@@ -98,6 +104,7 @@ def runner():
 
     return mod
 
+# drop synonyms carrying facet words -- they misroute a dose question
 def drop_facet_aliases(aliases: dict[str, str]) -> dict[str, str]:
     mr = runner()
 
@@ -213,13 +220,14 @@ SALTS = ("sodium", "hydrochloride", "hcl", "calcium", "potassium", "besylate",
          "monohydrate", "anhydrous", "micronized", "extended", "release",
          "delayed", "er", "xr", "sr", "dr")
 
-# Must be a HEADING, not the word in passing. A bare \bPregnancy\b match started
+# must be a HEADING, not the word in passing. A bare \bPregnancy\b match started
 # glyburide's answer mid-sentence at "...pregnancy or for use in pediatric patients."
 PREG_START = re.compile(r"8\.\d+\s+Pregnancy\b|\bPregnancy\s*(?:Risk Summary|:)", re.I)
 PREG_END = re.compile(r"8\.\d+\s+(?:Pediatric|Geriatric|Renal|Hepatic|Females and Males)"
                       r"|(?<![\w.])(?:Pediatric Use|Geriatric Use|Renal Impairment|"
                       r"Hepatic Impairment)\b", re.I)
 
+# keep only the pregnancy section, which openFDA files under a longer heading
 def pregnancy_only(text: str) -> str:
     m = PREG_START.search(text)
 
@@ -232,6 +240,7 @@ def pregnancy_only(text: str) -> str:
 
     return out if len(out) >= MIN_CHARS_DRUG else ""
 
+# normalise label text and strip the FDA cross-references read as incidence
 def clean(text: str) -> str:
     t = re.sub(r"\s+", " ", text).strip()
     # strip fda self-references like "( 6.1 )" -- a model read them as incidence
@@ -245,6 +254,7 @@ def clean(text: str) -> str:
 
     return t
 
+# one openFDA label for a generic, or None when nothing usable returns
 def fetch_label(generic: str) -> dict | None:
     q = urllib.parse.quote(f'openfda.generic_name:"{generic}"')
 
@@ -290,6 +300,7 @@ def fetch_label(generic: str) -> dict | None:
 
     return best
 
+# reject a label whose generic name does not match what was asked for
 def validate(res: dict, generic: str) -> str | None:
     ofda = res.get("openfda", {})
     names = [n.lower() for n in (ofda.get("generic_name") or [])]
@@ -309,6 +320,7 @@ def validate(res: dict, generic: str) -> str | None:
     
     return None
 
+# map brand names onto indexed generics, so a trade name still retrieves
 def brand_aliases(indexed: set[str]) -> dict[str, str]:
     seen: dict[str, set[str]] = {}
 
@@ -325,7 +337,7 @@ def brand_aliases(indexed: set[str]) -> dict[str, str]:
 
         for t in terms:
             b = (t.get("term") or "").lower().strip()
-            # no minimum count: a >=2 floor removed every brand people name.
+            # no minimum count: a >=2 floor removed every brand people name
             # pfizer publishes one Lipitor label. measured 0/9 with it in place
 
             if not b or len(b) > 28:
@@ -341,7 +353,7 @@ def brand_aliases(indexed: set[str]) -> dict[str, str]:
 
         time.sleep(0.2)
 
-    # A brand naming two different generics is ambiguous -- drop it rather than answer
+    # a brand naming two different generics is ambiguous -- drop it rather than answer
     # about the wrong drug. (An earlier setdefault silently kept whichever came first.)
     out = {b: next(iter(g)) for b, g in seen.items() if len(g) == 1}
 
@@ -364,7 +376,7 @@ def brand_aliases(indexed: set[str]) -> dict[str, str]:
 
     # critical. otc brand names are ordinary medical words -- ALLERGY, SLEEP AID --
     # and aliasing them rewrites "what is allergy?" into a drug question. a term
-    # naming a condition in MedQuAD is never a brand.
+    # naming a condition in MedQuAD is never a brand
     #
     # an alias must point AT a drug we hold, never AWAY from one: omeprazole was
     # aliased to its salt counter-ion and its dose question quoted the MAGNESIUM
@@ -392,6 +404,7 @@ def brand_aliases(indexed: set[str]) -> dict[str, str]:
         
     return out
 
+# fetch, validate and clean every drug label, then write the CSV and aliases
 def run_drugs() -> None:
     rows = []
     rejected: list[tuple[str, str]] = []
@@ -464,7 +477,7 @@ def run_drugs() -> None:
 # than a definition blob. facet is not set here -- facet_of() derives it from the
 # question text, so this corpus cannot disagree with the runner
 
-# seed terms covering the categories the corpus-gap battery measured as weak.
+# seed terms covering the categories the corpus-gap battery measured as weak
 # deduplicated by title, so overlapping seeds cost only a request
 SEEDS = [s.strip() for s in """
 anxiety|depression|PTSD|bipolar disorder|schizophrenia|panic disorder|OCD|ADHD|autism
@@ -503,6 +516,7 @@ HEADINGS = [
     (r"what (is|are)|what does|types of|why do i need",         "What is (are) {t} ?"),
 ]
 
+# unescape HTML and drop the search-highlighting spans MedlinePlus adds
 def unescape_strip(fragment: str) -> str:
     t = html.unescape(fragment)
     t = re.sub(r"</?span[^>]*>", "", t)          # <span class="qt0"> search highlighting
@@ -513,6 +527,7 @@ def unescape_strip(fragment: str) -> str:
 
     return t.strip()
 
+# turn a section heading into the question form the corpus is keyed on
 def question_for(heading: str, topic: str) -> str:
     low = heading.lower()
 
@@ -523,6 +538,7 @@ def question_for(heading: str, topic: str) -> str:
         
     return f"What is (are) {topic} ?"
 
+# search MedlinePlus for a topic, raw XML back, or None
 def fetch_topic(term: str) -> str | None:
     q = urllib.parse.urlencode({"db": "healthTopics", "term": term, "retmax": RETMAX})
 
@@ -534,9 +550,11 @@ def fetch_topic(term: str) -> str | None:
 
         return None
 
+# walk the <document> blocks of a response one at a time
 def documents(xml: str):
     for doc in re.findall(r"<document\b.*?</document>", xml, re.S):
 
+        # one named content field out of a document block
         def field(name: str) -> str:
             m = re.search(rf'<content name="{name}">(.*?)</content>', doc, re.S)
 
@@ -551,6 +569,7 @@ def documents(xml: str):
             "alts": [unescape_strip(a) for a in re.findall(r'<content name="altTitle">(.*?)</content>', doc, re.S)],
         }
 
+# split a topic summary at its headings, one row per section
 def split_sections(summary: str) -> list[tuple[str, str]]:
     raw = re.sub(r"</?span[^>]*>", "", html.unescape(summary))
     heads = list(re.finditer(r"([A-Z][^<>]{4,110}\?)\s*<p>", raw))
@@ -575,6 +594,7 @@ def split_sections(summary: str) -> list[tuple[str, str]]:
 
     return out
 
+# fetch every health topic, split into sections, write the CSV and aliases
 def run_medlineplus() -> None:
     rows: list[dict] = []
     aliases: dict[str, str] = {}
@@ -665,8 +685,8 @@ def main() -> None:
     ap.add_argument("source", choices=["drugs", "medlineplus", "all"])
 
     args = ap.parse_args()
-    # Order matters for "all": the topic fetcher drops synonyms that shadow a condition
-    # already indexed, and drug_labels.csv is one of the corpora it checks against.
+    # order matters for "all": the topic fetcher drops synonyms that shadow a condition
+    # already indexed, and drug_labels.csv is one of the corpora it checks against
     if args.source in ("drugs", "all"):
         run_drugs()
         
