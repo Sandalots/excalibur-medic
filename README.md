@@ -112,15 +112,6 @@ training.
 the answer is medically correct (see [Limitations](#limitations)). A perfect score of 1.0 isn't
 possible because the model rewords the source rather than copying it.
 
-<p align="center">
-  <img src="artifacts/plots/capacity_ceiling.png" width="49%" alt="More training data lowers perplexity but leaves grounding flat">
-  <img src="artifacts/plots/ablation_base_vs_sft.png" width="49%" alt="Original vs distilled model given identical search results">
-</p>
-<p align="center">
-  <img src="artifacts/plots/grounding_ladder.png" width="49%" alt="Grounding scores from an unrelated-document baseline up to a perfect self-match">
-  <img src="artifacts/plots/retrieval_ladder.png" width="49%" alt="Search accuracy rising from 49.2% to 88.2% over five changes">
-</p>
-
 ### On the device: Raspberry Pi 5 (2 GB, no screen, Raspberry Pi OS Lite)
 Speed in tokens per second (a token is about three-quarters of a word), by number of CPU cores
 used:
