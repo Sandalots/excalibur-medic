@@ -1,0 +1,37 @@
+cff-version: 1.2.0
+message: "If you use this work, please cite the dissertation below."
+type: software
+title: "EXCALIBUR-Medic"
+abstract: >-
+  An offline clinical question-answering system for a 2 GB Raspberry Pi 5.
+  A 1B model distilled from an 8B medical teacher answers from a BM25 index
+  over 19,411 NIH, FDA and MedlinePlus documents, with retrieval-side guards
+  that refuse when no suitable source exists.
+authors:
+  - family-names: MacDonald
+    given-names: Sandy
+    affiliation: University of Aberdeen
+    orcid: "https://orcid.org/0009-0002-6153-7592"
+repository-code: "https://github.com/Sandalots/excalibur-medic"
+license: MIT
+date-released: 2026-08-17
+keywords:
+  - edge AI
+  - Raspberry Pi
+  - knowledge distillation
+  - retrieval-augmented generation
+  - medical question answering
+  - small language models
+preferred-citation:
+  type: thesis
+  thesis-type: "MSc dissertation"
+  title: "EXCALIBUR-Medic: Can Distillation and Retrieval Enable On-Device Clinical Inference on 2 GB Edge Devices?"
+  authors:
+    - family-names: MacDonald
+      given-names: Sandy
+      orcid: "https://orcid.org/0009-0002-6153-7592"
+  institution:
+    name: University of Aberdeen
+  department: Department of Computing Science
+  year: 2026
+  month: 8
