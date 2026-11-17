@@ -3,7 +3,7 @@
 
 Sandy MacDonald ([ORCID 0009-0002-6153-7592](https://orcid.org/0009-0002-6153-7592)) · MSc Artificial Intelligence, University of Aberdeen (2026) · Supervisor: Dr Dewei Yi
 
-[Dissertation](docs/report.pdf) · [▶ Video demonstration](https://drive.google.com/file/d/182-pbX9Y78gS9a8E_-rt8Ax0jTa4Y4sR/view?usp=sharing) · [🤗 Model on Hugging Face](https://huggingface.co/Sandalots/Llama-3.2-EXCALIBUR-Medic-1B-GGUF) · [Installation](INSTALLATION.md)
+**[Try it live in your browser](https://sandalots-excalibur-medic.static.hf.space/index.html)** · [Dissertation](docs/report.pdf) · [▶ Video demonstration](https://drive.google.com/file/d/182-pbX9Y78gS9a8E_-rt8Ax0jTa4Y4sR/view?usp=sharing) · [🤗 Model on Hugging Face](https://huggingface.co/Sandalots/Llama-3.2-EXCALIBUR-Medic-1B-GGUF) · [Installation](INSTALLATION.md)
 
 <p align="center">
   <a href="https://drive.google.com/file/d/182-pbX9Y78gS9a8E_-rt8Ax0jTa4Y4sR/view?usp=sharing">
@@ -21,6 +21,11 @@ is sent over the internet.
 
 The model looks things up rather than answering from memory. When no suitable passage exists,
 the system says so instead of guessing.
+
+You can try it without a Pi. The
+[browser demo](https://sandalots-excalibur-medic.static.hf.space/index.html) runs the same
+search, safety checks and model entirely in your browser, with nothing sent to a server. It is
+fastest in Chrome or Edge, which can use the GPU.
 
 ## Research question
 Large AI models can now pass medical licensing exams, but they run on remote servers. That
