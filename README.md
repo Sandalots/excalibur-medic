@@ -3,7 +3,7 @@
 
 Sandy MacDonald ([ORCID 0009-0002-6153-7592](https://orcid.org/0009-0002-6153-7592)) · MSc Artificial Intelligence, University of Aberdeen (2026) · Supervisor: Dr Dewei Yi
 
-[📄 Dissertation (PDF)](docs/report.pdf) · [▶ Video demonstration](https://drive.google.com/file/d/182-pbX9Y78gS9a8E_-rt8Ax0jTa4Y4sR/view?usp=sharing) · [🤗 Model on Hugging Face](https://huggingface.co/Sandalots/Llama-3.2-EXCALIBUR-Medic-1B-GGUF) · [Installation](INSTALLATION.md)
+[Dissertation](docs/report.pdf) · [▶ Video demonstration](https://drive.google.com/file/d/182-pbX9Y78gS9a8E_-rt8Ax0jTa4Y4sR/view?usp=sharing) · [🤗 Model on Hugging Face](https://huggingface.co/Sandalots/Llama-3.2-EXCALIBUR-Medic-1B-GGUF) · [Installation](INSTALLATION.md)
 
 <p align="center">
   <a href="https://drive.google.com/file/d/182-pbX9Y78gS9a8E_-rt8Ax0jTa4Y4sR/view?usp=sharing">
