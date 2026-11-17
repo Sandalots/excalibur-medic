@@ -3,7 +3,7 @@
 
 Sandy MacDonald ([ORCID 0009-0002-6153-7592](https://orcid.org/0009-0002-6153-7592)) · MSc Artificial Intelligence, University of Aberdeen (2026) · Supervisor: Dr Dewei Yi
 
-[📄 Dissertation (PDF)](docs/report.pdf) · [▶ Video demonstration](https://drive.google.com/file/d/182-pbX9Y78gS9a8E_-rt8Ax0jTa4Y4sR/view?usp=sharing) · [Installation](INSTALLATION.md)
+[📄 Dissertation (PDF)](docs/report.pdf) · [▶ Video demonstration](https://drive.google.com/file/d/182-pbX9Y78gS9a8E_-rt8Ax0jTa4Y4sR/view?usp=sharing) · [🤗 Model on Hugging Face](https://huggingface.co/Sandalots/Llama-3.2-EXCALIBUR-Medic-1B-GGUF) · [Installation](INSTALLATION.md)
 
 <p align="center">
   <a href="https://drive.google.com/file/d/182-pbX9Y78gS9a8E_-rt8Ax0jTa4Y4sR/view?usp=sharing">
@@ -224,7 +224,10 @@ outlook.
 ./benchmark_pi.sh --energy   # ~50 min: idle power, energy per answer, heat test
 ```
 
-The trained model and its training data are too large for GitHub, so they are in a
+The deployed model is on
+[Hugging Face](https://huggingface.co/Sandalots/Llama-3.2-EXCALIBUR-Medic-1B-GGUF). Download
+`excalibur-medic-1b-Q4_K_M.gguf` into `artifacts/` and you can skip building the model
+entirely. The training files are in a
 [Google Drive folder](https://drive.google.com/drive/folders/1EAQRNXt1oq0X2fIOPTo2tkavDMHiOQ4O).
 All of them are optional, because the notebook can regenerate each one:
 
@@ -246,8 +249,9 @@ All of them are optional, because the notebook can regenerate each one:
 ```
 
 ## Licence
-The code is released under the [MIT Licence](LICENSE). The licence doesn't cover the data or
-the dissertation:
+The code is released under the [MIT Licence](LICENSE). That licence covers the code only:
+- **The trained model** is a derivative of Llama 3.2, so it is distributed under the
+  [Llama 3.2 Community License](https://www.llama.com/llama3_2/license/). Built with Llama.
 - **MedQuAD** ([`datasets/medquad.csv`](datasets/medquad.csv)) is by Asma Ben Abacha and
   Dina Demner-Fushman, used under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/):
   [*A Question-Entailment Approach to Question Answering*](https://bmcbioinformatics.biomedcentral.com/articles/10.1186/s12859-019-3119-4),
