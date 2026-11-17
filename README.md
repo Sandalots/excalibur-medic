@@ -254,8 +254,6 @@ the dissertation:
   BMC Bioinformatics 20, 511 (2019).
 - **openFDA** drug labels and **MedlinePlus** health topics are US government works, provided
   by the FDA and the National Library of Medicine respectively.
-- **The dissertation** ([`docs/report.pdf`](docs/report.pdf)) is © Sandy MacDonald, all rights
-  reserved.
 
 ## Disclaimer
 This is a research prototype. It is not a medical device and does not give medical advice.
